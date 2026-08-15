@@ -24,12 +24,11 @@
   flex-direction: column;
   gap: 14px;
   width: 100%;
-  /* Tall inventories (7 tab cards + 9 viewer cards + general rows) must
-     never be clipped by the settings shell: fill the shell's options area
-     and scroll inside the section when the content outgrows the panel. */
-  height: 100%;
-  min-height: 0;
-  overflow-y: auto;
+  max-width: 760px;
+  /* The DSH settings shell's `.options` area owns vertical scrolling. Keep
+     this page a plain content column like Plugins → Plugin list so its
+     scrollbar stays at the shell edge instead of being inset by the options
+     area's right padding. */
 }
 
 /* One-line section intro (the DSH section heading+intro recipe). */

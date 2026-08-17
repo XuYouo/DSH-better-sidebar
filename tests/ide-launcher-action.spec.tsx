@@ -111,6 +111,7 @@ describe('IdeLauncherAction', () => {
     await act(async () => {})
     const chooser = container.querySelector<HTMLButtonElement>('button[aria-label="Choose IDE"]')!
     expect(chooser.getAttribute('aria-expanded')).toBe('false')
+    expect(chooser.querySelectorAll('svg')).toHaveLength(2)
     await act(async () => { chooser.click() })
     const rows = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
     expect(rows.slice(0, 2).map(row => row.textContent)).toEqual(['Cursor', 'Zed'])
@@ -153,10 +154,13 @@ describe('IdeIcon Simple Icons coverage', () => {
       createElement('div', {}, IDE_CATALOG.map(ide => createElement(IdeIcon, { key: ide.id, id: ide.id }))),
     )
     expect(container.querySelectorAll('[data-simple-icon]')).toHaveLength(14)
+    expect(container.querySelector('[data-ide-icon="vscode"]')).not.toBeNull()
+    expect(container.querySelector<HTMLImageElement>('[data-ide-icon="vscode"]')?.src)
+      .toMatch(/^data:image\/svg\+xml;base64,/)
     expect(container.querySelector('[data-simple-icon="xcode"]')).not.toBeNull()
     expect(container.querySelector('[data-simple-icon="cursor"]')).not.toBeNull()
     expect(container.querySelector('[data-simple-icon="zedindustries"]')).not.toBeNull()
-    expect(container.textContent).toBe('VSCVS')
+    expect(container.textContent).toBe('VS')
     unmount()
   })
 })

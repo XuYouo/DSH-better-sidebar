@@ -46,6 +46,7 @@ import {
 } from './pty-deps.ts'
 import { registerTools } from './tools.ts'
 import { buildJobsApi, type SidebarJobsRoutes } from './jobs-routes.ts'
+import { createIdeLauncher, IdeLauncherError, type IdeLauncher } from './ide-launcher.ts'
 import { readJsonBody, requireString, SidebarError, writeError, writeJson, writeOk } from './wire.ts'
 
 export { Config }
@@ -188,6 +189,7 @@ function buildApi(
   ctx: Context,
   ptyManager: PtyManager | null,
   agentPtyRegistry: AgentPtyRegistry | null,
+  ideLauncher: IdeLauncher,
   resolved: ResolvedSidebarConfig,
   getSettings: () => SidebarSettingsFace | undefined,
 ): Record<string, ApiMethod> {
@@ -207,6 +209,24 @@ function buildApi(
     'session.cwd': (payload) => {
       const { sessionId, cwd } = cwdOf(payload)
       return { sessionId, cwd, root: rootLabel(cwd), parent: parentOf(cwd) ?? null }
+    },
+    // IDE discovery runs on the DSH HOST. The browser receives only stable
+    // catalog ids/names; executable paths never cross the wire. Opening is
+    // restricted to one of those ids and the authoritative session cwd, so
+    // this route cannot be repurposed as an arbitrary process launcher.
+    'ide.list': () => ideLauncher.list(),
+    'ide.open': async (payload) => {
+      const { cwd } = cwdOf(payload)
+      const ideId = requireString(payload, 'ideId')
+      try {
+        await ideLauncher.open(ideId, cwd)
+      } catch (error) {
+        if (error instanceof IdeLauncherError) {
+          throw new SidebarError(error.code, error.message, error.code === 'ide-not-found' ? 404 : 500)
+        }
+        throw error
+      }
+      return { ok: true }
     },
     'fs.tree': async (payload) => {
       const { cwd } = cwdOf(payload)
@@ -477,6 +497,10 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
   // through the terminal_create tool; the sidebar view attaches through the
   // same /sidebar/ws/terminal upgrade with ?uuid=... instead of ?tab=...
   const agentPtyRegistry = nodePty !== null ? new AgentPtyRegistry(terminalShell, nodePty) : null
+  // One short-lived detection cache is shared by every session header. It
+  // scans only this host's standard application/PATH locations and performs
+  // no work until the user first opens the IDE menu.
+  const ideLauncher = createIdeLauncher()
 
   // ── User-facing "Side card" preferences ──────────────────────────────────
   // Register the namespace with the settings provider so the Settings page
@@ -538,7 +562,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
   })
 
   // ── JSON API ────────────────────────────────────────────────────────────
-  const api = buildApi(ctx, ptyManager, agentPtyRegistry, resolved, () => settingsFace)
+  const api = buildApi(ctx, ptyManager, agentPtyRegistry, ideLauncher, resolved, () => settingsFace)
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: '/sidebar/api',

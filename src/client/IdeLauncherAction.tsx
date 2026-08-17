@@ -1,7 +1,7 @@
 /** Session-header utility for opening the session cwd in a host IDE. */
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  IconChevronDownOutline14,
+  IconChecklistOutline14,
   IconCodeOutline16,
   IconLoadingOutline16,
   Menu,
@@ -23,7 +23,11 @@ export interface IdeLauncherActionProps {
   openIde(scope: SessionScope, id: IdeId): Promise<void>
 }
 
-/** Native DSH capsule + Menu, ordered immediately before Session Log. */
+/**
+ * DSH-native split capsule ordered immediately before Session Log:
+ * the primary icon opens the first detected IDE, while the chevron alone
+ * owns the full chooser menu.
+ */
 export function IdeLauncherAction({
   sessionId,
   useSessions,
@@ -50,13 +54,21 @@ export function IdeLauncherAction({
     }
   }, [listIdes])
 
-  const toggle = useCallback(() => {
-    setOpen(value => {
-      const next = !value
-      if (next) void detect()
-      return next
-    })
-  }, [detect])
+  // The primary affordance must show the first installed IDE before the user
+  // interacts, so detection starts when this Session header entry mounts.
+  useEffect(() => { void detect() }, [detect])
+
+  const firstIde = ides?.[0]
+
+  const launch = useCallback((ide: InstalledIde) => {
+    setOpeningId(ide.id)
+    setError(null)
+    const scope: SessionScope = { sessionId, ...(cwd ? { cwd } : {}) }
+    void openIde(scope, ide.id).catch((cause) => {
+      setError(cause instanceof Error ? cause.message : String(cause))
+      setOpen(true)
+    }).finally(() => { setOpeningId(null) })
+  }, [cwd, openIde, sessionId])
 
   const entries = useMemo<MenuEntry[]>(() => {
     const items: MenuEntry[] = [{ type: 'label', id: 'installed', text: t('ideInstalled') }]
@@ -78,55 +90,73 @@ export function IdeLauncherAction({
     return items
   }, [error, ides, loading, openingId, t])
 
-  const footer = useMemo<MenuEntry[]>(() => {
-    const items: MenuEntry[] = []
-    if (error !== null) items.push({ id: 'error', label: t('ideError', { message: error }), disabled: true })
-    items.push({ id: 'host-hint', label: t('ideHostHint'), disabled: true })
-    return items
-  }, [error, t])
+  const footer = useMemo<MenuEntry[]>(() => (
+    error === null ? [] : [{ id: 'error', label: t('ideError', { message: error }), disabled: true }]
+  ), [error, t])
 
   const select = useCallback((raw: string) => {
     const ide = ides?.find(candidate => candidate.id === raw)
     if (ide === undefined) return
     setOpen(false)
-    setOpeningId(ide.id)
-    setError(null)
-    const scope: SessionScope = { sessionId, ...(cwd ? { cwd } : {}) }
-    void openIde(scope, ide.id).catch((cause) => {
-      setError(cause instanceof Error ? cause.message : String(cause))
-      setOpen(true)
-    }).finally(() => { setOpeningId(null) })
-  }, [cwd, ides, openIde, sessionId])
+    launch(ide)
+  }, [ides, launch])
+
+  const toggleMenu = useCallback(() => {
+    setOpen(value => {
+      const next = !value
+      if (next && !loading) void detect()
+      return next
+    })
+  }, [detect, loading])
 
   const busy = openingId !== null
-  const anchor = (
-    <button
-      type="button"
-      className={css.trigger}
-      aria-haspopup="menu"
-      aria-expanded={open}
-      aria-busy={busy || loading}
-      title={t('ideHostHint')}
-      onClick={toggle}
-    >
-      {busy ? <IconLoadingOutline16 size={14} className={css.spinner} /> : <IconCodeOutline16 size={14} />}
-      <span>{t('ideOpen')}</span>
-      <IconChevronDownOutline14 size={12} className={open ? css.chevronOpen : undefined} />
-    </button>
-  )
+  const primaryLabel = firstIde === undefined
+    ? t('ideOpen')
+    : t('ideOpenWith', { name: firstIde.name })
 
   return (
-    <Menu
-      open={open}
-      anchor={anchor}
-      items={entries}
-      footer={footer}
-      onSelect={select}
-      onClose={() => { setOpen(false) }}
-      align="start"
-      side="bottom"
-      portal
-      dense
-    />
+    <span className={css.splitTrigger}>
+      <button
+        type="button"
+        className={css.primaryButton}
+        aria-label={primaryLabel}
+        title={primaryLabel}
+        disabled={firstIde === undefined || busy}
+        aria-busy={busy || loading}
+        onClick={() => { if (firstIde !== undefined) launch(firstIde) }}
+      >
+        {busy || (loading && firstIde === undefined)
+          ? <IconLoadingOutline16 size={16} className={css.spinner} />
+          : firstIde === undefined
+            ? <IconCodeOutline16 size={16} />
+            : <IdeIcon id={firstIde.id} />}
+      </button>
+      <Menu
+        open={open}
+        className={css.menuSeat}
+        anchor={(
+          <button
+            type="button"
+            className={css.menuButton}
+            aria-label={t('ideChoose')}
+            title={t('ideChoose')}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            onClick={toggleMenu}
+          >
+            <IconChecklistOutline14 size={14} />
+          </button>
+        )}
+        items={entries}
+        footer={footer}
+        selectedId={firstIde?.id}
+        onSelect={select}
+        onClose={() => { setOpen(false) }}
+        align="end"
+        side="bottom"
+        portal
+        dense
+      />
+    </span>
   )
 }

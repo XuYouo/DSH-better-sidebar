@@ -30,7 +30,6 @@
 
 .menuButton {
   width: 27px;
-  border-left: 1px solid var(--dsw-alias-border-l2);
   border-radius: 0 17px 17px 0;
 }
 
@@ -47,6 +46,19 @@
 .menuSeat {
   display: inline-flex;
   height: 30px;
+}
+
+.menuGlyph {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 16px;
+}
+
+.menuGlyph svg + svg {
+  margin-top: -4px;
 }
 
 .spinner {

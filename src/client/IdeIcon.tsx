@@ -19,11 +19,12 @@ import {
 } from 'simple-icons'
 import type { IdeId } from '../ide-catalog.ts'
 import css from './IdeLauncherAction.module.css'
+import { VSCODE_ICON_SRC } from './vscode-icon.ts'
 
 /**
  * Simple Icons 16.x currently covers fourteen of the sixteen detected IDEs.
- * VS Code and Visual Studio are not present in that catalog, so those two use
- * explicit text monograms instead of a hand-drawn lookalike.
+ * VS Code uses the user-supplied official-style SVG; Visual Studio is the
+ * sole text fallback because it is not present in the current catalog.
  */
 const SIMPLE_ICONS: Partial<Record<IdeId, SimpleIcon>> = {
   cursor: siCursor,
@@ -43,12 +44,23 @@ const SIMPLE_ICONS: Partial<Record<IdeId, SimpleIcon>> = {
 }
 
 const FALLBACK_LABELS: Partial<Record<IdeId, string>> = {
-  vscode: 'VSC',
   'visual-studio': 'VS',
 }
 
 /** Render the Simple Icons path with DSH's adaptive foreground color. */
 export function IdeIcon({ id }: { id: IdeId }): ReactNode {
+  if (id === 'vscode') {
+    return (
+      <img
+        className={css.ideIcon}
+        src={VSCODE_ICON_SRC}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        data-ide-icon="vscode"
+      />
+    )
+  }
   const icon = SIMPLE_ICONS[id]
   if (icon !== undefined) {
     return (

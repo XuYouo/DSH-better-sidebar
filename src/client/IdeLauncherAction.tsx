@@ -1,7 +1,8 @@
 /** Session-header utility for opening the session cwd in a host IDE. */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  IconChecklistOutline14,
+  IconChevronDownOutline14,
+  IconChevronUpOutline14,
   IconCodeOutline16,
   IconLoadingOutline16,
   Menu,
@@ -144,7 +145,10 @@ export function IdeLauncherAction({
             aria-expanded={open}
             onClick={toggleMenu}
           >
-            <IconChecklistOutline14 size={14} />
+            <span className={css.menuGlyph} aria-hidden="true">
+              <IconChevronUpOutline14 size={9} />
+              <IconChevronDownOutline14 size={9} />
+            </span>
           </button>
         )}
         items={entries}
